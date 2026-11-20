@@ -1,0 +1,681 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ระบบสมุดรายวันเฉพาะ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=Sarabun:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: ledger-paper workbench. Header strip with actions, scrolling tab rail, one working panel per book. */
+:root{
+  --bg:#f3f4ef; --surface:#fbfbf7; --ink:#1c2432; --muted:#586174; --rule:#d3d7cc;
+  --head:#e6eae0; --tint:#eef2e9; --accent:#0e5a63; --accent-ink:#ffffff;
+  --good:#1d7447; --good-bg:#e1f0e6; --bad:#b3261e; --bad-bg:#fbe4e1; --warn:#8a5a00;
+  --font-display:'Mitr','Sarabun',system-ui,sans-serif;
+  --font-body:'Sarabun','Noto Sans Thai',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11161c; --surface:#181e26; --ink:#e5e9f0; --muted:#9ba4b4; --rule:#2d3541;
+    --head:#202833; --tint:#1b222c; --accent:#5cc0cc; --accent-ink:#052428;
+    --good:#72d6a0; --good-bg:#16301f; --bad:#ff8f86; --bad-bg:#3a1b19; --warn:#e2b75e;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11161c; --surface:#181e26; --ink:#e5e9f0; --muted:#9ba4b4; --rule:#2d3541;
+  --head:#202833; --tint:#1b222c; --accent:#5cc0cc; --accent-ink:#052428;
+  --good:#72d6a0; --good-bg:#16301f; --bad:#ff8f86; --bad-bg:#3a1b19; --warn:#e2b75e;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 56px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--font-display);font-weight:500;margin:0;text-wrap:balance}
+h1{font-size:1.6rem;line-height:1.25}
+h2{font-size:1.25rem}
+h3{font-size:1.05rem}
+p{margin:0}
+.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
+.top .sub{color:var(--muted);font-size:.9rem;margin-top:4px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:6px;padding:8px 16px;font-weight:600}
+.btn.alt{background:transparent;color:var(--accent)}
+.btn.ghost{border-color:var(--rule);background:transparent;color:var(--ink);font-weight:500}
+.btn.small{padding:3px 9px;font-size:.85rem}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--rule);scrollbar-width:thin}
+.tabs button{flex:0 0 auto;background:transparent;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:9px 14px;font-weight:500;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+.tabs .cnt{display:inline-block;min-width:1.4em;margin-left:6px;padding:0 6px;border-radius:9px;background:var(--head);font-size:.78rem;font-variant-numeric:tabular-nums}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:16px}
+.stack{display:flex;flex-direction:column;gap:16px}
+.banner{border-radius:8px;padding:10px 14px;font-weight:600;border:1px solid transparent}
+.banner.ok{background:var(--good-bg);color:var(--good);border-color:var(--good)}
+.banner.bad{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+.banner.info{background:var(--tint);color:var(--ink);border-color:var(--rule);font-weight:500}
+.muted{color:var(--muted)}
+.paper{overflow-x:auto;border:1px solid var(--rule);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;min-width:560px}
+th,td{padding:6px 10px;border-bottom:1px solid var(--rule);vertical-align:top;text-align:left}
+th{background:var(--head);font-weight:600;text-align:center;border-left:1px solid var(--rule);font-size:.88rem}
+th:first-child{border-left:0}
+td+td{border-left:1px solid var(--rule)}
+td.num,th.num{text-align:right;white-space:nowrap}
+td.c{text-align:center}
+tr.yr td{color:var(--muted);border-bottom:0;padding-bottom:0}
+tr.tot td{font-weight:700;background:var(--tint);border-top:2px solid var(--ink)}
+tr.acc td{color:var(--muted);font-size:.85rem;text-align:right;border-bottom:3px double var(--rule)}
+.sub{color:var(--muted);font-size:.85rem}
+.indent{padding-left:1.6em!important}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f>span{font-size:.85rem;color:var(--muted);font-weight:500}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:7px 9px;min-width:0;width:100%}
+fieldset{border:1px solid var(--rule);border-radius:6px;padding:12px;margin:0;min-width:0}
+legend{padding:0 6px;font-weight:600;font-size:.9rem}
+.form{display:flex;flex-direction:column;gap:14px}
+.live{font-weight:600;font-variant-numeric:tabular-nums}
+.live.ok{color:var(--good)} .live.bad{color:var(--bad)}
+.err{color:var(--bad);font-weight:600}
+.row2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.glrow{display:grid;grid-template-columns:minmax(140px,2fr) minmax(120px,1.5fr) minmax(90px,1fr) minmax(90px,1fr) auto;gap:8px;align-items:end}
+@media (max-width:620px){.glrow{grid-template-columns:1fr 1fr}.glrow .f:first-child,.glrow .f:nth-child(2){grid-column:1/-1}}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.85rem;color:var(--muted)}
+.ledgers{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:16px}
+.ledgers .card{min-width:0;padding:12px}
+.card h3 small{font-family:var(--font-body);color:var(--muted);font-weight:400;font-size:.85rem}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.check{display:flex;gap:8px;align-items:flex-start}
+.check input{width:auto;margin-top:5px}
+footer{color:var(--muted);font-size:.82rem}
+@media (prefers-reduced-motion:no-preference){.tabs button{transition:color .15s,border-color .15s}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>ระบบสมุดรายวันเฉพาะ</h1>
+      <p class="sub">กิจการสมมติ ร้านค้าปลีกซื้อมาขายไป ไม่มีภาษีมูลค่าเพิ่ม · เดือน ส.ค. 2563 · AC101 การบัญชีเบื้องต้น</p>
+    </div>
+    <div class="actions">
+      <button class="btn" data-act="load" type="button">โหลดตัวอย่าง</button>
+      <button class="btn ghost" data-act="clear" type="button">ล้างข้อมูล</button>
+    </div>
+  </header>
+  <div id="alert" role="status"></div>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="เมนูสมุดรายวันและรายงาน"></nav>
+  <main id="view" class="stack"></main>
+  <footer>สร้างด้วย Claude AI เพื่องานวิชา AC101 ใช้ข้อมูลสมมติเท่านั้น ผู้จัดทำต้องตรวจเดบิต เครดิต และงบทดลองด้วยตนเองก่อนส่งงาน</footer>
+</div>
+<script>
+'use strict';
+/* ===== ข้อมูลหลัก: ผังบัญชี สมุดรายวัน ===== */
+const MONTH = 'ส.ค.', YEAR = '2563';
+const COA = [
+  [11,'เงินสด'],[12,'เงินฝากธนาคาร'],[13,'ลูกหนี้การค้า'],[15,'วัสดุสำนักงาน'],[16,'เครื่องตกแต่ง'],
+  [21,'เจ้าหนี้การค้า'],[22,'เจ้าหนี้อื่น'],[31,'ทุน'],
+  [41,'ขาย'],[42,'รับคืนสินค้า'],[43,'ส่วนลดจ่าย'],
+  [51,'ซื้อ'],[52,'ส่งคืนสินค้า'],[53,'ส่วนลดรับ'],[54,'ค่าขนส่งเข้า'],[55,'ค่าเช่า'],[56,'ค่าสาธารณูปโภค'],[57,'เงินเดือน']
+];
+const NAME = {}; COA.forEach(a => NAME[a[0]] = a[1]);
+const BOOKS = {
+  purchases: { name: 'สมุดรายวันซื้อ', code: 'ซ' },
+  sales:     { name: 'สมุดรายวันขาย', code: 'ข' },
+  receipts:  { name: 'สมุดรายวันรับเงิน', code: 'รง' },
+  payments:  { name: 'สมุดรายวันจ่ายเงิน', code: 'จง' },
+  general:   { name: 'สมุดรายวันทั่วไป', code: 'ทป' }
+};
+const KEY = 'ac101-special-journals-v1';
+
+const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
+const fmt = n => Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const dash = n => (r2(n) ? fmt(n) : '');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+function freshDb() { return { seq: 0, purchases: [], sales: [], receipts: [], payments: [], general: [] }; }
+let db = freshDb();
+function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {} }
+function restore() {
+  try {
+    const s = localStorage.getItem(KEY);
+    if (s) { const d = JSON.parse(s); if (d && typeof d.seq === 'number') db = Object.assign(freshDb(), d); }
+  } catch (e) {}
+}
+
+/* ===== ยอดเดบิต/เครดิตของแต่ละรายการ ===== */
+function sides(book, e) {
+  if (book === 'purchases' || book === 'sales') return { dr: r2(e.amt), cr: r2(e.amt) };
+  if (book === 'receipts') return { dr: r2(e.cash + e.bank + e.disc), cr: r2(e.ar + e.sales + e.otherAmt) };
+  if (book === 'payments') return { dr: r2(e.ap + e.purch + e.otherAmt), cr: r2(e.cash + e.bank + e.pdisc) };
+  let dr = 0, cr = 0;
+  (e.lines || []).forEach(l => { dr += l.dr; cr += l.cr; });
+  return { dr: r2(dr), cr: r2(cr) };
+}
+
+/* ===== ตรวจความถูกต้องของข้อมูลก่อนบันทึก ===== */
+function check(book, e) {
+  if (!Number.isInteger(e.day) || e.day < 1 || e.day > 31) return 'กรอกวันที่เป็นตัวเลข 1 ถึง 31';
+  if (book === 'purchases' || book === 'sales') {
+    if (!e.party) return book === 'purchases' ? 'กรอกชื่อเจ้าหนี้ (ผู้ขาย)' : 'กรอกชื่อลูกหนี้ (ลูกค้า)';
+    if (!(e.amt > 0)) return 'กรอกจำนวนเงินมากกว่า 0';
+    return '';
+  }
+  if (book === 'receipts' || book === 'payments') {
+    const isR = book === 'receipts';
+    const total = isR ? e.cash + e.bank + e.disc + e.ar + e.sales + e.otherAmt
+                      : e.cash + e.bank + e.pdisc + e.ap + e.purch + e.otherAmt;
+    if (!(total > 0)) return 'ยังไม่ได้กรอกจำนวนเงิน';
+    const sub = isR ? e.ar : e.ap;
+    if (sub > 0 && !(isR ? e.arParty : e.apParty)) return isR ? 'มีการรับชำระหนี้ ต้องกรอกชื่อลูกหนี้เพื่อผ่านบัญชีย่อย' : 'มีการจ่ายชำระหนี้ ต้องกรอกชื่อเจ้าหนี้เพื่อผ่านบัญชีย่อย';
+    if (e.otherAmt > 0) {
+      if (!NAME[e.otherAcct]) return 'เลือกบัญชีอื่นที่เกี่ยวข้อง';
+      if (e.otherAcct === 13 || e.otherAcct === 21) return 'ลูกหนี้การค้าและเจ้าหนี้การค้าให้กรอกในช่องของตนเอง เพื่อให้ผ่านบัญชีย่อย';
+    }
+    return '';
+  }
+  const ls = e.lines || [];
+  if (ls.length < 2) return 'สมุดรายวันทั่วไปต้องมีอย่างน้อย 2 บรรทัด';
+  for (const l of ls) {
+    if (!NAME[l.acct]) return 'เลือกบัญชีให้ครบทุกบรรทัด';
+    if (l.dr > 0 && l.cr > 0) return 'แต่ละบรรทัดกรอกได้ทั้งเดบิตหรือเครดิตเพียงอย่างเดียว';
+    if (!(l.dr > 0) && !(l.cr > 0)) return 'ทุกบรรทัดต้องมียอดเดบิตหรือเครดิต';
+    if ((l.acct === 13 || l.acct === 21) && !l.party) return 'บัญชี ' + NAME[l.acct] + ' ต้องกรอกชื่อลูกหนี้/เจ้าหนี้';
+  }
+  return '';
+}
+
+/* ===== บันทึกรายการ (ถ้าเดบิต ≠ เครดิต จะไม่บันทึก เว้นแต่เปิดโหมดทดสอบ) ===== */
+function addEntry(book, e, allowUnbalanced) {
+  const err = check(book, e);
+  if (err) return { ok: false, msg: err };
+  const s = sides(book, e), diff = r2(s.dr - s.cr);
+  if (diff !== 0 && !allowUnbalanced) {
+    return { ok: false, msg: 'เดบิตไม่เท่ากับเครดิต: เดบิตรวม ' + fmt(s.dr) + ' เครดิตรวม ' + fmt(s.cr) + ' ต่างกัน ' + fmt(Math.abs(diff)) + ' บาท ระบบไม่บันทึกรายการนี้' };
+  }
+  e.id = ++db.seq;
+  db[book].push(e);
+  db[book].sort((a, b) => a.day - b.day || a.id - b.id);
+  save();
+  return { ok: true, unbalanced: diff !== 0, msg: diff !== 0
+    ? 'บันทึกแล้วในโหมดทดสอบ แต่เดบิตไม่เท่ากับเครดิต (ต่างกัน ' + fmt(Math.abs(diff)) + ' บาท) ดูแจ้งเตือนที่งบทดลอง'
+    : 'บันทึกแล้ว ระบบผ่านรายการไปบัญชีแยกประเภททั่วไปและบัญชีย่อยโดยอัตโนมัติ' };
+}
+function removeEntry(book, id) {
+  db[book] = db[book].filter(e => e.id !== id);
+  save();
+}
+
+/* ===== ผ่านรายการ: แตกแต่ละรายการในสมุดเป็นบรรทัดเดบิต/เครดิตของบัญชีแยกประเภท ===== */
+function allLines() {
+  const out = []; let n = 0;
+  const push = (book, e, i, acct, dr, cr, desc, party) => {
+    dr = r2(dr); cr = r2(cr);
+    if (!dr && !cr) return;
+    out.push({ book, id: e.id, ref: BOOKS[book].code + (i + 1), day: e.day, acct, dr, cr, desc, party: party || '', n: n++ });
+  };
+  db.purchases.forEach((e, i) => {
+    push('purchases', e, i, 51, e.amt, 0, 'ซื้อสินค้า จาก ' + e.party);
+    push('purchases', e, i, 21, 0, e.amt, 'ซื้อสินค้า' + (e.inv ? ' ใบกำกับ ' + e.inv : ''), e.party);
+  });
+  db.sales.forEach((e, i) => {
+    push('sales', e, i, 13, e.amt, 0, 'ขายสินค้า' + (e.inv ? ' ใบกำกับ ' + e.inv : ''), e.party);
+    push('sales', e, i, 41, 0, e.amt, 'ขายสินค้า ให้ ' + e.party);
+  });
+  db.receipts.forEach((e, i) => {
+    const d = e.desc || 'รับเงิน';
+    push('receipts', e, i, 11, e.cash, 0, d);
+    push('receipts', e, i, 12, e.bank, 0, d);
+    push('receipts', e, i, 43, e.disc, 0, d);
+    push('receipts', e, i, 13, 0, e.ar, d, e.arParty);
+    push('receipts', e, i, 41, 0, e.sales, d);
+    if (e.otherAmt) push('receipts', e, i, e.otherAcct, 0, e.otherAmt, d);
+  });
+  db.payments.forEach((e, i) => {
+    const d = e.desc || 'จ่ายเงิน';
+    push('payments', e, i, 11, 0, e.cash, d);
+    push('payments', e, i, 12, 0, e.bank, d);
+    push('payments', e, i, 53, 0, e.pdisc, d);
+    push('payments', e, i, 21, e.ap, 0, d, e.apParty);
+    push('payments', e, i, 51, e.purch, 0, d);
+    if (e.otherAmt) push('payments', e, i, e.otherAcct, e.otherAmt, 0, d);
+  });
+  db.general.forEach((e, i) => {
+    e.lines.forEach(l => push('general', e, i, l.acct, l.dr, l.cr, e.desc || 'รายการทั่วไป', l.party));
+  });
+  out.sort((a, b) => a.day - b.day || a.id - b.id || a.n - b.n);
+  return out;
+}
+
+/* บัญชีแยกประเภททั่วไป: รวมรายการตามเลขที่บัญชี พร้อมยอดคงเหลือสะสม */
+function buildLedger(lines) {
+  const g = {};
+  lines.forEach(l => { (g[l.acct] = g[l.acct] || []).push(l); });
+  const res = {};
+  Object.keys(g).forEach(k => {
+    let bal = 0, dr = 0, cr = 0;
+    res[k] = { acct: +k, rows: g[k].map(l => { bal = r2(bal + l.dr - l.cr); dr += l.dr; cr += l.cr; return Object.assign({}, l, { bal }); }), dr: r2(dr), cr: r2(cr), bal: r2(dr - cr) };
+  });
+  return res;
+}
+
+/* บัญชีย่อย: ลูกหนี้การค้า (13) และเจ้าหนี้การค้า (21) แยกรายชื่อ */
+function buildSub(lines, acct) {
+  const m = {};
+  lines.filter(l => l.acct === acct && l.party).forEach(l => { (m[l.party] = m[l.party] || []).push(l); });
+  return Object.keys(m).map(name => {
+    let bal = 0, dr = 0, cr = 0;
+    const rows = m[name].map(l => { bal = r2(bal + l.dr - l.cr); dr += l.dr; cr += l.cr; return Object.assign({}, l, { bal }); });
+    return { name, rows, dr: r2(dr), cr: r2(cr), bal: r2(dr - cr) };
+  });
+}
+
+/* งบทดลอง และการเทียบบัญชีย่อยกับบัญชีคุม */
+function buildTB() {
+  const lines = allLines(), led = buildLedger(lines);
+  const rows = COA.filter(a => led[a[0]]).map(a => {
+    const net = led[a[0]].bal;
+    return { acct: a[0], name: a[1], dr: net > 0 ? net : 0, cr: net < 0 ? -net : 0 };
+  });
+  const dr = r2(rows.reduce((s, r) => s + r.dr, 0)), cr = r2(rows.reduce((s, r) => s + r.cr, 0));
+  const ar = buildSub(lines, 13), ap = buildSub(lines, 21);
+  const arSum = r2(ar.reduce((s, p) => s + p.bal, 0)), apSum = r2(ap.reduce((s, p) => s + p.bal, 0));
+  const arCtl = led[13] ? led[13].bal : 0, apCtl = led[21] ? led[21].bal : 0;
+  return { lines, led, rows, dr, cr, balanced: dr === cr, ar, ap, arSum, apSum, arCtl, apCtl, arOk: arSum === arCtl, apOk: apSum === apCtl };
+}
+/* ===== รายการค้าตัวอย่าง 19 รายการ (ข้อมูลสมมติ) ===== */
+const P = {
+  tcc: 'มหาวิทยาลัยหอการค้าไทย', namo: 'บริษัท นะโม จำกัด', khem: 'บริษัท เข็มทอง จำกัด',
+  fah: 'บริษัท ฟ้าใส จำกัด', ban: 'โรงเรียนอนุบาลกล้วยหอม', dd: 'บริษัท ดีดี จำกัด'
+};
+const Z = { cash: 0, bank: 0, disc: 0, ar: 0, arParty: '', sales: 0, otherAcct: 0, otherAmt: 0,
+            pdisc: 0, ap: 0, apParty: '', purch: 0 };
+const TX = [
+  { day: 1, book: 'receipts', text: 'นำเงินสด 300,000 บาท และเงินฝากธนาคาร 200,000 บาท มาลงทุน',
+    why: 'เป็นรายการรับเงินเข้ากิจการ ทำให้เงินสดและเงินฝากธนาคารเพิ่ม จึงบันทึกในสมุดรับเงิน', calc: '300,000 + 200,000 = 500,000 เครดิต ทุน',
+    e: { desc: 'เจ้าของนำเงินสดและเงินฝากธนาคารมาลงทุน', cash: 300000, bank: 200000, otherAcct: 31, otherAmt: 500000 } },
+  { day: 2, book: 'sales', text: 'ขายสินค้า 30,000 บาท ให้มหาวิทยาลัยหอการค้าไทย เป็นเงินเชื่อ เงื่อนไข 2/10, n/30 ใบกำกับสินค้าเลขที่ 1111',
+    why: 'ขายสินค้าเป็นเงินเชื่อ ใช้สมุดขาย', calc: 'เดบิต ลูกหนี้ 30,000 เครดิต ขาย 30,000',
+    e: { inv: '1111', party: P.tcc, terms: '2/10, n/30', amt: 30000 } },
+  { day: 3, book: 'purchases', text: 'ซื้อสินค้า 55,000 บาท จากบริษัท นะโม จำกัด เป็นเงินเชื่อ เงื่อนไข 2/10, n/30 ใบกำกับสินค้าเลขที่ 2001',
+    why: 'ซื้อสินค้าเป็นเงินเชื่อ ใช้สมุดซื้อ', calc: 'เดบิต ซื้อ 55,000 เครดิต เจ้าหนี้ 55,000',
+    e: { inv: '2001', party: P.namo, terms: '2/10, n/30', amt: 55000 } },
+  { day: 4, book: 'payments', text: 'จ่ายค่าขนส่งจากการซื้อสินค้าเมื่อวันที่ 2 สิงหาคม จำนวน 2,000 บาท',
+    why: 'จ่ายเป็นเงินสด ใช้สมุดจ่ายเงิน', calc: 'เดบิต ค่าขนส่งเข้า 2,000 เครดิต เงินสด 2,000',
+    e: { desc: 'จ่ายค่าขนส่งจากการซื้อสินค้าเมื่อวันที่ 2 สิงหาคม', cash: 2000, otherAcct: 54, otherAmt: 2000 } },
+  { day: 5, book: 'sales', text: 'ขายสินค้า 45,000 บาท ให้บริษัท เข็มทอง จำกัด เป็นเงินเชื่อ เงื่อนไข 2/10, n/30 ใบกำกับสินค้าเลขที่ 1112',
+    why: 'ขายสินค้าเป็นเงินเชื่อ ใช้สมุดขาย', calc: 'เดบิต ลูกหนี้ 45,000 เครดิต ขาย 45,000',
+    e: { inv: '1112', party: P.khem, terms: '2/10, n/30', amt: 45000 } },
+  { day: 6, book: 'receipts', text: 'ขายสินค้า 42,000 บาท ให้ส่วนลดการค้า 5% ได้รับชำระเป็นเช็คและนำฝากธนาคารทันที',
+    why: 'ขายสินค้าและรับเงินทันที จึงเป็นการขายเงินสด ใช้สมุดรับเงิน ส่วนลดการค้าหักออกจากราคาขายก่อนแล้วบันทึกยอดสุทธิ ไม่ใช่ส่วนลดจ่าย',
+    calc: 'ส่วนลดการค้า 42,000 × 5% = 2,100 ขายสุทธิ 42,000 − 2,100 = 39,900',
+    e: { desc: 'ขายสินค้าได้รับเป็นเช็คและนำฝากธนาคารทันที (หักส่วนลดการค้า 5% = 2,100)', bank: 39900, sales: 39900 } },
+  { day: 8, book: 'purchases', text: 'ซื้อสินค้า 78,000 บาท จากบริษัท ฟ้าใส จำกัด เป็นเงินเชื่อ เงื่อนไข 1/10, n/30 ใบกำกับสินค้าเลขที่ 3456',
+    why: 'ซื้อสินค้าเป็นเงินเชื่อ ใช้สมุดซื้อ', calc: 'เดบิต ซื้อ 78,000 เครดิต เจ้าหนี้ 78,000',
+    e: { inv: '3456', party: P.fah, terms: '1/10, n/30', amt: 78000 } },
+  { day: 12, book: 'payments', text: 'จ่ายชำระหนี้ทั้งสิ้นให้บริษัท นะโม จำกัด เป็นเช็ค',
+    why: 'จ่ายชำระหนี้เจ้าหนี้ ใช้สมุดจ่ายเงิน จ่ายวันที่ 12 อยู่ในช่วง 10 วันนับจากวันที่ 3 (ครบกำหนดส่วนลดวันที่ 13) จึงได้ส่วนลดรับ',
+    calc: 'ส่วนลด 55,000 × 2% = 1,100 จ่ายสุทธิ 55,000 − 1,100 = 53,900',
+    e: { desc: 'จ่ายชำระหนี้ทั้งสิ้นให้บริษัท นะโม จำกัด เป็นเช็ค', bank: 53900, pdisc: 1100, ap: 55000, apParty: P.namo } },
+  { day: 13, book: 'receipts', text: 'รับชำระหนี้ทั้งสิ้นจากมหาวิทยาลัยหอการค้าไทย',
+    why: 'รับเงินจากลูกหนี้ ใช้สมุดรับเงิน รับวันที่ 13 เกิน 10 วันนับจากวันที่ 2 (หมดส่วนลดวันที่ 12) จึงไม่ได้ส่วนลดจ่าย รับเต็มจำนวน',
+    calc: 'ไม่มีส่วนลด รับ 30,000 เต็มจำนวน',
+    e: { desc: 'รับชำระหนี้ทั้งสิ้นจากมหาวิทยาลัยหอการค้าไทย', cash: 30000, ar: 30000, arParty: P.tcc } },
+  { day: 13, book: 'general', text: 'ซื้อเครื่องตกแต่งเป็นเงินเชื่อ จำนวน 5,000 บาท',
+    why: 'ซื้อสินทรัพย์ที่ไม่ใช่สินค้าเป็นเงินเชื่อ สมุดซื้อใช้เฉพาะซื้อสินค้า จึงบันทึกในสมุดทั่วไป', calc: 'เดบิต เครื่องตกแต่ง 5,000 เครดิต เจ้าหนี้อื่น 5,000',
+    e: { desc: 'ซื้อเครื่องตกแต่งเป็นเงินเชื่อ', lines: [ { acct: 16, dr: 5000, cr: 0, party: '' }, { acct: 22, dr: 0, cr: 5000, party: '' } ] } },
+  { day: 14, book: 'receipts', text: 'รับชำระหนี้ทั้งสิ้นจากบริษัท เข็มทอง จำกัด เป็นเช็คและนำฝากธนาคารทันที',
+    why: 'รับเงินจากลูกหนี้ ใช้สมุดรับเงิน รับวันที่ 14 อยู่ในช่วง 10 วันนับจากวันที่ 5 (ครบกำหนดวันที่ 15) จึงให้ส่วนลดจ่าย',
+    calc: 'ส่วนลด 45,000 × 2% = 900 รับสุทธิ 45,000 − 900 = 44,100',
+    e: { desc: 'รับชำระหนี้ทั้งสิ้นจากบริษัท เข็มทอง จำกัด เป็นเช็คและนำฝากธนาคารทันที', bank: 44100, disc: 900, ar: 45000, arParty: P.khem } },
+  { day: 16, book: 'general', text: 'รับคืนสินค้าจากการขายเมื่อวันที่ 2 สิงหาคม จำนวน 1,500 บาท',
+    why: 'สินค้าที่รับคืนมาจากการขายเชื่อ ทำให้ยอดขายและยอดลูกหนี้ลดลง สมุดเฉพาะไม่มีช่องรองรับ จึงบันทึกในสมุดทั่วไป', calc: 'เดบิต รับคืนสินค้า 1,500 เครดิต ลูกหนี้การค้า (มหาวิทยาลัยหอการค้าไทย) 1,500',
+    e: { desc: 'รับคืนสินค้าจากการขายเมื่อวันที่ 2 สิงหาคม', lines: [ { acct: 42, dr: 1500, cr: 0, party: '' }, { acct: 13, dr: 0, cr: 1500, party: P.tcc } ] } },
+  { day: 17, book: 'sales', text: 'ขายสินค้า 15,000 บาท ให้โรงเรียนอนุบาลกล้วยหอม เป็นเงินเชื่อ เงื่อนไข 1/15, n/30 ใบกำกับสินค้าเลขที่ 1113',
+    why: 'ขายสินค้าเป็นเงินเชื่อ ใช้สมุดขาย', calc: 'เดบิต ลูกหนี้ 15,000 เครดิต ขาย 15,000',
+    e: { inv: '1113', party: P.ban, terms: '1/15, n/30', amt: 15000 } },
+  { day: 18, book: 'payments', text: 'จ่ายชำระหนี้ทั้งสิ้นให้บริษัท ฟ้าใส จำกัด เป็นเงินสด',
+    why: 'จ่ายชำระหนี้เจ้าหนี้ ใช้สมุดจ่ายเงิน จ่ายวันที่ 18 ยังอยู่ในช่วง 10 วันนับจากวันที่ 8 จึงได้ส่วนลดรับ',
+    calc: 'ส่วนลด 78,000 × 1% = 780 จ่ายสุทธิ 78,000 − 780 = 77,220',
+    e: { desc: 'จ่ายชำระหนี้ทั้งสิ้นให้บริษัท ฟ้าใส จำกัด เป็นเงินสด', cash: 77220, pdisc: 780, ap: 78000, apParty: P.fah } },
+  { day: 19, book: 'purchases', text: 'ซื้อสินค้า 34,400 บาท จากบริษัท ดีดี จำกัด เป็นเงินเชื่อ เงื่อนไข 3/10, n/30 ใบกำกับสินค้าเลขที่ 4444',
+    why: 'ซื้อสินค้าเป็นเงินเชื่อ ใช้สมุดซื้อ', calc: 'เดบิต ซื้อ 34,400 เครดิต เจ้าหนี้ 34,400',
+    e: { inv: '4444', party: P.dd, terms: '3/10, n/30', amt: 34400 } },
+  { day: 21, book: 'payments', text: 'ซื้อสินค้าเป็นเงินสด 40,000 บาท ได้รับส่วนลดการค้า 3%',
+    why: 'ซื้อสินค้าเป็นเงินสด ใช้สมุดจ่ายเงิน ส่วนลดการค้าหักออกจากราคาแล้วบันทึกยอดสุทธิ ไม่ใช่ส่วนลดรับ',
+    calc: 'ส่วนลดการค้า 40,000 × 3% = 1,200 ซื้อสุทธิ 40,000 − 1,200 = 38,800',
+    e: { desc: 'ซื้อสินค้าเป็นเงินสด 40,000 หักส่วนลดการค้า 3% (1,200)', cash: 38800, purch: 38800 } },
+  { day: 25, book: 'payments', text: 'จ่ายค่าเช่าอาคารเป็นเงินสด จำนวน 23,000 บาท',
+    why: 'จ่ายค่าใช้จ่ายเป็นเงินสด ใช้สมุดจ่ายเงิน', calc: 'เดบิต ค่าเช่า 23,000 เครดิต เงินสด 23,000',
+    e: { desc: 'จ่ายค่าเช่าอาคารเป็นเงินสด', cash: 23000, otherAcct: 55, otherAmt: 23000 } },
+  { day: 29, book: 'payments', text: 'จ่ายชำระหนี้ทั้งสิ้นให้บริษัท ดีดี จำกัด เป็นเงินสด',
+    why: 'จ่ายชำระหนี้เจ้าหนี้ ใช้สมุดจ่ายเงิน จ่ายวันที่ 29 ครบ 10 วันนับจากวันที่ 19 พอดี จึงได้ส่วนลดรับ',
+    calc: 'ส่วนลด 34,400 × 3% = 1,032 จ่ายสุทธิ 34,400 − 1,032 = 33,368',
+    e: { desc: 'จ่ายชำระหนี้ทั้งสิ้นให้บริษัท ดีดี จำกัด เป็นเงินสด', cash: 33368, pdisc: 1032, ap: 34400, apParty: P.dd } },
+  { day: 30, book: 'payments', text: 'จ่ายค่าสาธารณูปโภคเป็นเงินสด จำนวน 4,000 บาท',
+    why: 'จ่ายค่าใช้จ่ายเป็นเงินสด ใช้สมุดจ่ายเงิน', calc: 'เดบิต ค่าสาธารณูปโภค 4,000 เครดิต เงินสด 4,000',
+    e: { desc: 'จ่ายค่าสาธารณูปโภคเป็นเงินสด', cash: 4000, otherAcct: 56, otherAmt: 4000 } },
+  { day: 31, book: 'payments', text: 'จ่ายเงินเดือนพนักงานเป็นเงินสด จำนวน 16,000 บาท',
+    why: 'จ่ายค่าใช้จ่ายเป็นเงินสด ใช้สมุดจ่ายเงิน', calc: 'เดบิต เงินเดือน 16,000 เครดิต เงินสด 16,000',
+    e: { desc: 'จ่ายเงินเดือนพนักงานเป็นเงินสด', cash: 16000, otherAcct: 57, otherAmt: 16000 } }
+];
+
+function loadSample() {
+  db = freshDb();
+  const errs = [];
+  TX.forEach((t, i) => {
+    const e = JSON.parse(JSON.stringify(t.e));
+    e.day = t.day;
+    if (t.book === 'receipts' || t.book === 'payments') Object.keys(Z).forEach(k => { if (e[k] === undefined) e[k] = Z[k]; });
+    const r = addEntry(t.book, e, false);
+    if (!r.ok) errs.push('รายการที่ ' + (i + 1) + ': ' + r.msg);
+  });
+  return errs;
+}
+/* ===== สถานะหน้าจอ ===== */
+const ui = { tab: 'home', test: false, sub: 'gl', flash: null };
+const TABS = [
+  ['home', 'ภาพรวม'], ['tx', 'รายการค้า'], ['purchases', 'สมุดซื้อ'], ['sales', 'สมุดขาย'],
+  ['receipts', 'สมุดรับเงิน'], ['payments', 'สมุดจ่ายเงิน'], ['general', 'สมุดทั่วไป'],
+  ['ledger', 'แยกประเภท'], ['tb', 'งบทดลอง']
+];
+
+/* ===== ตัวช่วยสร้างฟอร์ม ===== */
+const $ = id => document.getElementById(id);
+const val = id => ($(id) ? $(id).value : '');
+const num = id => r2(parseFloat(val(id)) || 0);
+const fld = (id, label, attrs) => '<label class="f"><span>' + label + '</span><input id="' + id + '" ' + (attrs || '') + '></label>';
+const numF = (id, label) => fld(id, label, 'type="number" inputmode="decimal" min="0" step="0.01" placeholder="0"');
+const dayF = id => fld(id, 'วันที่ (' + MONTH + ')', 'type="number" inputmode="numeric" min="1" max="31" step="1" placeholder="1-31"');
+const acctOpts = () => '<option value="">เลือกบัญชี</option>' + COA.map(a => '<option value="' + a[0] + '">' + a[0] + ' ' + a[1] + '</option>').join('');
+const acctSel = (id, label) => '<label class="f"><span>' + label + '</span><select id="' + id + '">' + acctOpts() + '</select></label>';
+
+function partyList(acct) {
+  const names = []; allLines().forEach(l => { if (l.acct === acct && l.party && !names.includes(l.party)) names.push(l.party); });
+  return '<datalist id="dl-' + acct + '">' + names.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>';
+}
+
+function formSimple(book) {
+  const isP = book === 'purchases', p = isP ? 'pj' : 'sj';
+  return '<form id="f-' + book + '" class="card form" novalidate>' +
+    '<h3>บันทึก' + (isP ? 'การซื้อสินค้าเป็นเงินเชื่อ' : 'การขายสินค้าเป็นเงินเชื่อ') + '</h3>' +
+    '<div class="grid">' + dayF(p + '-day') +
+    fld(p + '-inv', 'เลขที่ใบกำกับสินค้า', 'type="text" placeholder="เช่น 1114"') +
+    fld(p + '-party', isP ? 'ชื่อเจ้าหนี้ (ผู้ขาย)' : 'ชื่อลูกหนี้ (ลูกค้า)', 'type="text" list="dl-' + (isP ? 21 : 13) + '" autocomplete="off"') +
+    fld(p + '-terms', 'เงื่อนไขการชำระเงิน', 'type="text" placeholder="2/10, n/30"') +
+    numF(p + '-amt', 'จำนวนเงิน (บาท)') + '</div>' +
+    '<div class="actions"><button class="btn" type="submit">บันทึกรายการ</button>' +
+    '<span class="muted">เดบิต ' + (isP ? 'ซื้อ (51) เครดิต เจ้าหนี้การค้า (21)' : 'ลูกหนี้การค้า (13) เครดิต ขาย (41)') + '</span></div>' +
+    '<div id="err-' + book + '" class="err" role="alert"></div>' + partyList(isP ? 21 : 13) + '</form>';
+}
+
+function formReceipts() {
+  return '<form id="f-receipts" class="card form" novalidate>' +
+    '<h3>บันทึกการรับเงิน</h3>' +
+    '<div class="grid">' + dayF('rc-day') + '<div class="f" style="grid-column:span 2"><label class="f"><span>คำอธิบายรายการ</span><input id="rc-desc" type="text" placeholder="เช่น รับชำระหนี้จากลูกหนี้"></label></div></div>' +
+    '<div class="row2">' +
+    '<fieldset><legend>เดบิต (เงินที่ได้รับ)</legend><div class="grid">' + numF('rc-cash', 'เงินสด (11)') + numF('rc-bank', 'เงินฝากธนาคาร (12)') + numF('rc-disc', 'ส่วนลดจ่าย (43)') + '</div></fieldset>' +
+    '<fieldset><legend>เครดิต (ที่มาของเงิน)</legend><div class="grid">' + numF('rc-ar', 'ลูกหนี้การค้า (13)') +
+    fld('rc-party', 'ชื่อลูกหนี้', 'type="text" list="dl-13" autocomplete="off"') + numF('rc-sales', 'ขาย (41)') +
+    acctSel('rc-oacct', 'บัญชีอื่น') + numF('rc-oamt', 'จำนวนเงินบัญชีอื่น') + '</div></fieldset></div>' +
+    '<div class="actions"><button class="btn" type="submit">บันทึกรายการ</button><span id="live-receipts" class="live"></span></div>' +
+    '<div id="err-receipts" class="err" role="alert"></div>' + partyList(13) + '</form>';
+}
+
+function formPayments() {
+  return '<form id="f-payments" class="card form" novalidate>' +
+    '<h3>บันทึกการจ่ายเงิน</h3>' +
+    '<div class="grid">' + dayF('pm-day') + '<div class="f" style="grid-column:span 2"><label class="f"><span>คำอธิบายรายการ</span><input id="pm-desc" type="text" placeholder="เช่น จ่ายค่าเช่าอาคารเป็นเงินสด"></label></div></div>' +
+    '<div class="row2">' +
+    '<fieldset><legend>เครดิต (เงินที่จ่ายออก)</legend><div class="grid">' + numF('pm-cash', 'เงินสด (11)') + numF('pm-bank', 'เงินฝากธนาคาร (12)') + numF('pm-disc', 'ส่วนลดรับ (53)') + '</div></fieldset>' +
+    '<fieldset><legend>เดบิต (จ่ายเพื่ออะไร)</legend><div class="grid">' + numF('pm-ap', 'เจ้าหนี้การค้า (21)') +
+    fld('pm-party', 'ชื่อเจ้าหนี้', 'type="text" list="dl-21" autocomplete="off"') + numF('pm-purch', 'ซื้อ (51)') +
+    acctSel('pm-oacct', 'บัญชีอื่น') + numF('pm-oamt', 'จำนวนเงินบัญชีอื่น') + '</div></fieldset></div>' +
+    '<div class="actions"><button class="btn" type="submit">บันทึกรายการ</button><span id="live-payments" class="live"></span></div>' +
+    '<div id="err-payments" class="err" role="alert"></div>' + partyList(21) + '</form>';
+}
+
+function glRow(i) {
+  return '<div class="glrow" data-row="' + i + '">' +
+    '<label class="f"><span>บัญชี</span><select class="g-acct">' + acctOpts() + '</select></label>' +
+    '<label class="f"><span>ชื่อลูกหนี้/เจ้าหนี้ (ถ้ามี)</span><input class="g-party" type="text" list="dl-gl" autocomplete="off"></label>' +
+    '<label class="f"><span>เดบิต</span><input class="g-dr" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0"></label>' +
+    '<label class="f"><span>เครดิต</span><input class="g-cr" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0"></label>' +
+    '<button class="btn ghost small g-del" type="button" aria-label="ลบบรรทัดนี้">ลบ</button></div>';
+}
+function formGeneral() {
+  const names = []; allLines().forEach(l => { if ((l.acct === 13 || l.acct === 21) && l.party && !names.includes(l.party)) names.push(l.party); });
+  return '<form id="f-general" class="card form" novalidate>' +
+    '<h3>บันทึกรายการทั่วไป</h3>' +
+    '<div class="grid">' + dayF('gj-day') + '<div class="f" style="grid-column:span 2"><label class="f"><span>คำอธิบายรายการ</span><input id="gj-desc" type="text" placeholder="เช่น ซื้อเครื่องตกแต่งเป็นเงินเชื่อ"></label></div></div>' +
+    '<div id="gj-lines" class="form">' + glRow(0) + glRow(1) + '</div>' +
+    '<div class="actions"><button class="btn alt" type="button" id="gj-add">เพิ่มบรรทัด</button><button class="btn" type="submit">บันทึกรายการ</button><span id="live-general" class="live"></span></div>' +
+    '<div id="err-general" class="err" role="alert"></div>' +
+    '<datalist id="dl-gl">' + names.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist></form>';
+}
+
+/* ===== อ่านค่าจากฟอร์ม ===== */
+function readForm(book) {
+  const day = parseInt(val(book === 'purchases' ? 'pj-day' : book === 'sales' ? 'sj-day' : book === 'receipts' ? 'rc-day' : book === 'payments' ? 'pm-day' : 'gj-day'), 10);
+  if (book === 'purchases' || book === 'sales') {
+    const p = book === 'purchases' ? 'pj' : 'sj';
+    return { day, inv: val(p + '-inv').trim(), party: val(p + '-party').trim(), terms: val(p + '-terms').trim(), amt: num(p + '-amt') };
+  }
+  if (book === 'receipts') {
+    return { day, desc: val('rc-desc').trim(), cash: num('rc-cash'), bank: num('rc-bank'), disc: num('rc-disc'),
+      ar: num('rc-ar'), arParty: val('rc-party').trim(), sales: num('rc-sales'),
+      otherAcct: parseInt(val('rc-oacct'), 10) || 0, otherAmt: num('rc-oamt'), pdisc: 0, ap: 0, apParty: '', purch: 0 };
+  }
+  if (book === 'payments') {
+    return { day, desc: val('pm-desc').trim(), cash: num('pm-cash'), bank: num('pm-bank'), pdisc: num('pm-disc'),
+      ap: num('pm-ap'), apParty: val('pm-party').trim(), purch: num('pm-purch'),
+      otherAcct: parseInt(val('pm-oacct'), 10) || 0, otherAmt: num('pm-oamt'), disc: 0, ar: 0, arParty: '', sales: 0 };
+  }
+  const lines = [...document.querySelectorAll('#gj-lines .glrow')].map(r => ({
+    acct: parseInt(r.querySelector('.g-acct').value, 10) || 0,
+    party: r.querySelector('.g-party').value.trim(),
+    dr: r2(parseFloat(r.querySelector('.g-dr').value) || 0),
+    cr: r2(parseFloat(r.querySelector('.g-cr').value) || 0)
+  }));
+  return { day, desc: val('gj-desc').trim(), lines };
+}
+
+function updateLive(book) {
+  const out = $('live-' + book); if (!out) return;
+  const s = sides(book, readForm(book));
+  const diff = r2(s.dr - s.cr);
+  if (!s.dr && !s.cr) { out.textContent = ''; out.className = 'live'; return; }
+  out.className = 'live ' + (diff === 0 ? 'ok' : 'bad');
+  out.textContent = 'เดบิตรวม ' + fmt(s.dr) + ' | เครดิตรวม ' + fmt(s.cr) + (diff === 0 ? ' | เท่ากัน' : ' | ต่างกัน ' + fmt(Math.abs(diff)));
+}
+
+function bindForm(book) {
+  const f = $('f-' + book); if (!f) return;
+  f.addEventListener('submit', ev => {
+    ev.preventDefault();
+    const r = addEntry(book, readForm(book), ui.test);
+    if (!r.ok) { $('err-' + book).textContent = r.msg; return; }
+    ui.flash = { book, msg: r.msg, bad: r.unbalanced };
+    render();
+  });
+  if (book === 'receipts' || book === 'payments' || book === 'general') {
+    f.addEventListener('input', () => updateLive(book));
+    f.addEventListener('change', () => updateLive(book));
+  }
+  if (book === 'general') {
+    $('gj-add').addEventListener('click', () => {
+      $('gj-lines').insertAdjacentHTML('beforeend', glRow(document.querySelectorAll('#gj-lines .glrow').length));
+    });
+    $('gj-lines').addEventListener('click', ev => {
+      if (ev.target.classList.contains('g-del')) {
+        if (document.querySelectorAll('#gj-lines .glrow').length > 2) { ev.target.closest('.glrow').remove(); updateLive('general'); }
+        else $('err-general').textContent = 'ต้องมีอย่างน้อย 2 บรรทัด';
+      }
+    });
+  }
+}
+/* ===== ตารางสมุดรายวัน (รูปแบบตามแบบฟอร์มตัวอย่าง) ===== */
+const delBtn = (book, id) => '<td class="c"><button class="btn ghost small" type="button" data-del="' + book + ':' + id + '" aria-label="ลบรายการ">ลบ</button></td>';
+const dt = e => MONTH + ' ' + e.day;
+const yrRow = span => '<tr class="yr"><td>' + YEAR + '</td><td colspan="' + (span - 1) + '"></td></tr>';
+const sum = (arr, k) => r2(arr.reduce((s, e) => s + (e[k] || 0), 0));
+
+function tblSimple(book) {
+  const isP = book === 'purchases', rows = db[book];
+  if (!rows.length) return '';
+  const total = sum(rows, 'amt');
+  return '<div class="paper"><table><thead><tr><th>วัน เดือน ปี</th><th>เลขที่ใบกำกับสินค้า</th><th>บัญชีที่' + (isP ? 'เครดิต' : 'เดบิต') + '</th><th>เงื่อนไขการชำระเงิน</th><th>เลขที่บัญชี</th><th>จำนวนเงิน</th><th></th></tr></thead><tbody>' +
+    yrRow(7) + rows.map(e => '<tr><td>' + dt(e) + '</td><td class="c">' + esc(e.inv || '-') + '</td><td>' + esc(e.party) + '</td><td class="c">' + esc(e.terms || '-') + '</td><td class="c">✓</td><td class="num">' + fmt(e.amt) + '</td>' + delBtn(book, e.id) + '</tr>').join('') +
+    '<tr class="tot"><td>' + MONTH + ' 31</td><td colspan="3">' + (isP ? 'เดบิต ซื้อ - เครดิต เจ้าหนี้การค้า' : 'เดบิต ลูกหนี้การค้า - เครดิต ขาย') + '</td><td class="c">' + (isP ? '51/21' : '13/41') + '</td><td class="num">' + fmt(total) + '</td><td></td></tr></tbody></table></div>';
+}
+
+function tblReceipts() {
+  const rows = db.receipts; if (!rows.length) return '';
+  const T = k => sum(rows, k);
+  return '<div class="paper"><table style="min-width:980px"><thead>' +
+    '<tr><th rowspan="2">วัน เดือน ปี</th><th rowspan="2">คำอธิบาย</th><th colspan="3">เดบิต</th><th colspan="5">เครดิต</th><th rowspan="2"></th></tr>' +
+    '<tr><th>เงินสด</th><th>เงินฝากธนาคาร</th><th>ส่วนลดจ่าย</th><th>ลูกหนี้การค้า</th><th>ขาย</th><th>บัญชีอื่น: ชื่อบัญชี</th><th>เลขที่</th><th>จำนวนเงิน</th></tr></thead><tbody>' +
+    yrRow(11) + rows.map(e => '<tr><td>' + dt(e) + '</td><td>' + esc(e.desc || 'รับเงิน') + (e.arParty ? '<div class="sub">ลูกหนี้: ' + esc(e.arParty) + ' ✓</div>' : '') + '</td>' +
+      '<td class="num">' + dash(e.cash) + '</td><td class="num">' + dash(e.bank) + '</td><td class="num">' + dash(e.disc) + '</td>' +
+      '<td class="num">' + dash(e.ar) + '</td><td class="num">' + dash(e.sales) + '</td>' +
+      '<td>' + (e.otherAmt ? esc(NAME[e.otherAcct]) : '') + '</td><td class="c">' + (e.otherAmt ? e.otherAcct : '') + '</td><td class="num">' + dash(e.otherAmt) + '</td>' + delBtn('receipts', e.id) + '</tr>').join('') +
+    '<tr class="tot"><td>' + MONTH + ' 31</td><td>รวม</td><td class="num">' + fmt(T('cash')) + '</td><td class="num">' + fmt(T('bank')) + '</td><td class="num">' + fmt(T('disc')) + '</td><td class="num">' + fmt(T('ar')) + '</td><td class="num">' + fmt(T('sales')) + '</td><td></td><td></td><td class="num">' + fmt(T('otherAmt')) + '</td><td></td></tr>' +
+    '<tr class="acc"><td colspan="2">เลขที่บัญชีที่ผ่านรายการยอดรวม</td><td>(11)</td><td>(12)</td><td>(43)</td><td>(13)</td><td>(41)</td><td></td><td>✓</td><td></td><td></td></tr></tbody></table></div>';
+}
+
+function tblPayments() {
+  const rows = db.payments; if (!rows.length) return '';
+  const T = k => sum(rows, k);
+  return '<div class="paper"><table style="min-width:1020px"><thead>' +
+    '<tr><th rowspan="2">วัน เดือน ปี</th><th rowspan="2">คำอธิบาย</th><th colspan="3">เครดิต</th><th colspan="5">เดบิต</th><th rowspan="2"></th></tr>' +
+    '<tr><th>เงินสด</th><th>เงินฝากธนาคาร</th><th>ส่วนลดรับ</th><th>เจ้าหนี้การค้า</th><th>ซื้อ</th><th>บัญชีอื่น: ชื่อบัญชี</th><th>เลขที่</th><th>จำนวนเงิน</th></tr></thead><tbody>' +
+    yrRow(11) + rows.map(e => '<tr><td>' + dt(e) + '</td><td>' + esc(e.desc || 'จ่ายเงิน') + (e.apParty ? '<div class="sub">เจ้าหนี้: ' + esc(e.apParty) + ' ✓</div>' : '') + '</td>' +
+      '<td class="num">' + dash(e.cash) + '</td><td class="num">' + dash(e.bank) + '</td><td class="num">' + dash(e.pdisc) + '</td>' +
+      '<td class="num">' + dash(e.ap) + '</td><td class="num">' + dash(e.purch) + '</td>' +
+      '<td>' + (e.otherAmt ? esc(NAME[e.otherAcct]) : '') + '</td><td class="c">' + (e.otherAmt ? e.otherAcct : '') + '</td><td class="num">' + dash(e.otherAmt) + '</td>' + delBtn('payments', e.id) + '</tr>').join('') +
+    '<tr class="tot"><td>' + MONTH + ' 31</td><td>รวม</td><td class="num">' + fmt(T('cash')) + '</td><td class="num">' + fmt(T('bank')) + '</td><td class="num">' + fmt(T('pdisc')) + '</td><td class="num">' + fmt(T('ap')) + '</td><td class="num">' + fmt(T('purch')) + '</td><td></td><td></td><td class="num">' + fmt(T('otherAmt')) + '</td><td></td></tr>' +
+    '<tr class="acc"><td colspan="2">เลขที่บัญชีที่ผ่านรายการยอดรวม</td><td>(11)</td><td>(12)</td><td>(53)</td><td>(21)</td><td>(51)</td><td></td><td>✓</td><td></td><td></td></tr></tbody></table></div>';
+}
+
+function tblGeneral() {
+  const rows = db.general; if (!rows.length) return '';
+  let dr = 0, cr = 0;
+  const body = rows.map(e => {
+    const ls = e.lines.map((l, i) => {
+      dr += l.dr; cr += l.cr;
+      return '<tr><td>' + (i === 0 ? dt(e) : '') + '</td><td class="' + (l.cr > 0 ? 'indent' : '') + '">' + esc(NAME[l.acct]) + (l.party ? ' - ' + esc(l.party) : '') + '</td><td class="c">' + l.acct + (l.party ? '/✓' : '') + '</td><td class="num">' + dash(l.dr) + '</td><td class="num">' + dash(l.cr) + '</td>' + (i === 0 ? delBtn('general', e.id).replace('<td', '<td rowspan="' + (e.lines.length + 1) + '"') : '') + '</tr>';
+    }).join('');
+    return ls + '<tr><td></td><td class="sub indent">' + esc(e.desc || '') + '</td><td></td><td></td><td></td></tr>';
+  }).join('');
+  return '<div class="paper"><table><thead><tr><th>วัน เดือน ปี</th><th>รายการ</th><th>เลขที่บัญชี</th><th>เดบิต</th><th>เครดิต</th><th></th></tr></thead><tbody>' +
+    yrRow(6) + body + '<tr class="tot"><td></td><td>รวม</td><td></td><td class="num">' + fmt(r2(dr)) + '</td><td class="num">' + fmt(r2(cr)) + '</td><td></td></tr></tbody></table></div>';
+}
+
+/* ===== หน้าต่าง ๆ ===== */
+function emptyNote(book) {
+  return '<div class="card muted">ยังไม่มีรายการใน' + BOOKS[book].name + ' กดปุ่ม “โหลดตัวอย่าง” ด้านบน หรือกรอกฟอร์มเพื่อบันทึกรายการ</div>';
+}
+function viewJournal(book) {
+  const form = book === 'purchases' || book === 'sales' ? formSimple(book) : book === 'receipts' ? formReceipts() : book === 'payments' ? formPayments() : formGeneral();
+  const tbl = book === 'purchases' || book === 'sales' ? tblSimple(book) : book === 'receipts' ? tblReceipts() : book === 'payments' ? tblPayments() : tblGeneral();
+  const f = ui.flash && ui.flash.book === book ? '<div class="banner ' + (ui.flash.bad ? 'bad' : 'ok') + '" role="status">' + esc(ui.flash.msg) + '</div>' : '';
+  const rows = db[book]; let sd = 0, sc = 0; rows.forEach(e => { const s = sides(book, e); sd += s.dr; sc += s.cr; });
+  const chk = rows.length ? '<p class="live ' + (r2(sd) === r2(sc) ? 'ok' : 'bad') + '">ตรวจยอดรวมสมุด: เดบิต ' + fmt(r2(sd)) + ' | เครดิต ' + fmt(r2(sc)) + (r2(sd) === r2(sc) ? ' | เท่ากัน' : ' | ไม่เท่ากัน') + '</p>' : '';
+  return '<h2>' + BOOKS[book].name + '</h2>' + f + form + (rows.length ? tbl + chk : emptyNote(book));
+}
+
+function viewHome() {
+  const tb = buildTB(), n = Object.keys(BOOKS).reduce((s, b) => s + db[b].length, 0);
+  const counts = Object.keys(BOOKS).map(b => '<li>' + BOOKS[b].name + ' <strong>' + db[b].length + '</strong> รายการ</li>').join('');
+  return '<div class="card stack"><h2>เริ่มต้นใช้งาน</h2>' +
+    '<p>' + (n ? 'ระบบมีข้อมูลอยู่ ' + n + ' รายการ เปิดแต่ละสมุดเพื่อดูการบันทึก แล้วไปที่ “แยกประเภท” และ “งบทดลอง” เพื่อดูการผ่านรายการอัตโนมัติ' : 'กดปุ่มโหลดตัวอย่างเพื่อดูรายการค้า') + '</p>' +
+    '<div class="actions"><button class="btn" data-act="load" type="button">โหลดตัวอย่าง</button>' + (n ? '<button class="btn alt" data-tab="tb" type="button">ดูงบทดลอง</button>' : '') + '</div></div>' +
+    '<div class="row2"><div class="card stack"><h3>จำนวนรายการในสมุด</h3><ul style="margin:0;padding-left:1.2em">' + counts + '</ul></div>' +
+    '<div class="card stack"><h3>โหมดทดสอบแจ้งเตือน</h3><label class="check"><input id="test-mode" type="checkbox"' + (ui.test ? ' checked' : '') + '><span>อนุญาตบันทึกรายการที่เดบิตไม่เท่าเครดิต เพื่อดูการแจ้งเตือนในงบทดลอง ปกติระบบจะปฏิเสธรายการนั้น</span></label></div></div>' +
+    '<div class="card stack"><h3>ผังบัญชีที่ใช้</h3><div class="paper"><table><thead><tr><th>เลขที่</th><th>ชื่อบัญชี</th><th>เลขที่</th><th>ชื่อบัญชี</th></tr></thead><tbody>' +
+    Array.from({ length: Math.ceil(COA.length / 2) }, (_, i) => { const a = COA[i], b = COA[i + Math.ceil(COA.length / 2)]; return '<tr><td class="c">' + a[0] + '</td><td>' + a[1] + '</td><td class="c">' + (b ? b[0] : '') + '</td><td>' + (b ? b[1] : '') + '</td></tr>'; }).join('') +
+    '</tbody></table></div><p class="sub">ส่วนลดการค้าหักจากราคาแล้วบันทึกยอดสุทธิ ส่วนลดรับและส่วนลดจ่ายเป็นส่วนลดเงินสดตามเงื่อนไข เช่น 2/10, n/30</p></div>';
+}
+
+function viewTx() {
+  const names = { purchases: 'สมุดซื้อ', sales: 'สมุดขาย', receipts: 'สมุดรับเงิน', payments: 'สมุดจ่ายเงิน', general: 'สมุดทั่วไป' };
+  return '<h2>รายการค้าและเหตุผลการเลือกสมุด</h2>' +
+    '<div class="actions"><button class="btn" data-act="load" type="button">โหลดตัวอย่าง</button><span class="muted">รายการค้า ' + TX.length + ' รายการ ครบทั้ง 5 สมุด</span></div>' +
+    '<div class="paper"><table style="min-width:900px"><thead><tr><th>วันที่</th><th>รายการค้า</th><th>สมุดที่บันทึก</th><th>เหตุผล</th><th>วิธีคิดตรวจด้วยมือ</th></tr></thead><tbody>' +
+    TX.map(t => '<tr><td class="c">' + t.day + '</td><td>' + esc(t.text) + '</td><td class="c">' + names[t.book] + '</td><td>' + esc(t.why) + '</td><td>' + esc(t.calc) + '</td></tr>').join('') +
+    '</tbody></table></div>' +
+    '<div class="card stack"><h3>สมมติฐานที่ใช้</h3><ul style="margin:0;padding-left:1.2em">' +
+    '<li>รายการวันที่ 12 จ่ายเป็นเช็คที่สั่งจ่ายจากบัญชีเงินฝากธนาคาร จึงเครดิตเงินฝากธนาคาร</li>' +
+    '<li>รายการวันที่ 13 รับชำระจากมหาวิทยาลัยเป็นเงินสด เพราะโจทย์ไม่ระบุวิธีรับ</li>' +
+    '<li>รายการวันที่ 16 มหาวิทยาลัยชำระหนี้ครบแล้วเมื่อวันที่ 13 บัญชีย่อยของมหาวิทยาลัยจึงมียอดเครดิต 1,500 บาท ซึ่งหักออกจากยอดลูกหนี้รวมของบัญชีคุม</li>' +
+    '<li>ส่วนลดการค้าของรายการวันที่ 6 และวันที่ 21 หักออกจากราคาก่อน แล้วบันทึกยอดสุทธิ</li></ul></div>';
+}
+
+function ledTable(rows, endBal, label) {
+  return '<div class="paper"><table style="min-width:520px"><thead><tr><th>วันที่</th><th>รายการ</th><th>อ้างอิง</th><th>เดบิต</th><th>เครดิต</th><th>คงเหลือ</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td>' + MONTH + ' ' + r.day + '</td><td>' + esc(r.desc) + (r.party && label !== 'sub' ? '<div class="sub">' + esc(r.party) + ' ✓</div>' : '') + '</td><td class="c">' + r.ref + '</td><td class="num">' + dash(r.dr) + '</td><td class="num">' + dash(r.cr) + '</td><td class="num">' + fmt(Math.abs(r.bal)) + ' ' + (r.bal < 0 ? 'ค' : 'ด') + '</td></tr>').join('') +
+    '<tr class="tot"><td colspan="3">ยอดคงเหลือ</td><td class="num">' + fmt(endBal.dr) + '</td><td class="num">' + fmt(endBal.cr) + '</td><td class="num">' + fmt(Math.abs(endBal.bal)) + ' ' + (endBal.bal < 0 ? 'ค' : 'ด') + '</td></tr></tbody></table></div>';
+}
+function viewLedger() {
+  const tb = buildTB();
+  const seg = '<div class="seg"><button class="btn ghost small" data-sub="gl" aria-pressed="' + (ui.sub === 'gl') + '" type="button">บัญชีแยกประเภททั่วไป</button>' +
+    '<button class="btn ghost small" data-sub="ar" aria-pressed="' + (ui.sub === 'ar') + '" type="button">บัญชีย่อยลูกหนี้</button>' +
+    '<button class="btn ghost small" data-sub="ap" aria-pressed="' + (ui.sub === 'ap') + '" type="button">บัญชีย่อยเจ้าหนี้</button></div>';
+  const legend = '<div class="legend"><span>อ้างอิง: ซ = สมุดซื้อ</span><span>ข = สมุดขาย</span><span>รง = สมุดรับเงิน</span><span>จง = สมุดจ่ายเงิน</span><span>ทป = สมุดทั่วไป</span><span>ด = ยอดเดบิต ค = ยอดเครดิต</span></div>';
+  if (!tb.lines.length) return '<h2>บัญชีแยกประเภท</h2>' + seg + '<div class="card muted">ยังไม่มีรายการ กดปุ่ม “โหลดตัวอย่าง” เพื่อดูการผ่านรายการอัตโนมัติ</div>';
+  let body = '';
+  if (ui.sub === 'gl') {
+    body = '<div class="ledgers">' + COA.filter(a => tb.led[a[0]]).map(a => { const L = tb.led[a[0]]; return '<div class="card stack"><h3>' + a[1] + ' <small>เลขที่ ' + a[0] + (a[0] === 13 || a[0] === 21 ? ' · บัญชีคุม' : '') + '</small></h3>' + ledTable(L.rows, L, 'gl') + '</div>'; }).join('') + '</div>';
+  } else {
+    const list = ui.sub === 'ar' ? tb.ar : tb.ap;
+    const ok = ui.sub === 'ar' ? tb.arOk : tb.apOk, ctl = ui.sub === 'ar' ? tb.arCtl : tb.apCtl, sm = ui.sub === 'ar' ? tb.arSum : tb.apSum;
+    body = '<div class="banner ' + (ok ? 'ok' : 'bad') + '">ผลรวมบัญชีย่อย ' + fmt(Math.abs(sm)) + ' บาท ' + (ok ? 'ตรงกับ' : 'ไม่ตรงกับ') + 'บัญชีคุม ' + (ui.sub === 'ar' ? 'ลูกหนี้การค้า (13)' : 'เจ้าหนี้การค้า (21)') + ' ' + fmt(Math.abs(ctl)) + ' บาท</div>' +
+      '<div class="ledgers">' + list.map(p => '<div class="card stack"><h3>' + esc(p.name) + '</h3>' + ledTable(p.rows, p, 'sub') + '</div>').join('') + '</div>';
+  }
+  return '<h2>บัญชีแยกประเภท</h2>' + seg + legend + body;
+}
+
+function viewTB() {
+  const tb = buildTB();
+  if (!tb.lines.length) return '<h2>งบทดลอง</h2><div class="card muted">ยังไม่มีรายการ กดปุ่ม “โหลดตัวอย่าง” เพื่อดูงบทดลอง</div>';
+  const st = (ok, t) => '<li><strong class="' + (ok ? 'live ok' : 'live bad') + '">' + (ok ? 'ผ่าน' : 'ไม่ผ่าน') + '</strong> ' + t + '</li>';
+  return '<h2>งบทดลอง ณ วันที่ 31 ' + MONTH + ' ' + YEAR + '</h2>' +
+    '<div class="banner ' + (tb.balanced ? 'ok' : 'bad') + '" role="status">' + (tb.balanced ? 'งบทดลองสมดุล ยอดเดบิตเท่ากับยอดเครดิต ' + fmt(tb.dr) + ' บาท' : 'แจ้งเตือน: ยอดเดบิตไม่เท่ากับยอดเครดิต เดบิต ' + fmt(tb.dr) + ' เครดิต ' + fmt(tb.cr) + ' ต่างกัน ' + fmt(Math.abs(r2(tb.dr - tb.cr))) + ' บาท') + '</div>' +
+    '<div class="paper"><table style="min-width:480px"><thead><tr><th>เลขที่บัญชี</th><th>ชื่อบัญชี</th><th>เดบิต</th><th>เครดิต</th></tr></thead><tbody>' +
+    tb.rows.map(r => '<tr><td class="c">' + r.acct + '</td><td>' + r.name + '</td><td class="num">' + dash(r.dr) + '</td><td class="num">' + dash(r.cr) + '</td></tr>').join('') +
+    '<tr class="tot"><td></td><td>รวม</td><td class="num">' + fmt(tb.dr) + '</td><td class="num">' + fmt(tb.cr) + '</td></tr></tbody></table></div>' +
+    '<div class="card stack"><h3>รายการตรวจสอบ</h3><ul style="margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px">' +
+    st(tb.balanced, 'ยอดเดบิตรวมเท่ากับยอดเครดิตรวม') +
+    st(tb.arOk, 'ผลรวมบัญชีย่อยลูกหนี้ ' + fmt(Math.abs(tb.arSum)) + ' ตรงกับบัญชีคุมลูกหนี้การค้า ' + fmt(Math.abs(tb.arCtl))) +
+    st(tb.apOk, 'ผลรวมบัญชีย่อยเจ้าหนี้ ' + fmt(Math.abs(tb.apSum)) + ' ตรงกับบัญชีคุมเจ้าหนี้การค้า ' + fmt(Math.abs(tb.apCtl))) +
+    '</ul></div>';
+}
+
+/* ===== วาดหน้าจอ ===== */
+function render() {
+  const tb = buildTB();
+  $('tabs').innerHTML = TABS.map(t => '<button role="tab" type="button" data-tab="' + t[0] + '" aria-selected="' + (ui.tab === t[0]) + '">' + t[1] + (BOOKS[t[0]] && db[t[0]].length ? '<span class="cnt">' + db[t[0]].length + '</span>' : '') + '</button>').join('');
+  $('alert').innerHTML = tb.lines.length && (!tb.balanced || !tb.arOk || !tb.apOk)
+    ? '<div class="banner bad">แจ้งเตือน: ' + (!tb.balanced ? 'งบทดลองไม่สมดุล ต่างกัน ' + fmt(Math.abs(r2(tb.dr - tb.cr))) + ' บาท ' : '') + (!tb.arOk || !tb.apOk ? 'บัญชีย่อยไม่ตรงกับบัญชีคุม' : '') + '</div>' : '';
+  if (!tb.lines.length) $('alert').innerHTML = '<div class="banner info">กดปุ่มโหลดตัวอย่างเพื่อดูรายการค้า</div>';
+  const v = ui.tab;
+  $('view').innerHTML = v === 'home' ? viewHome() : v === 'tx' ? viewTx() : v === 'ledger' ? viewLedger() : v === 'tb' ? viewTB() : viewJournal(v);
+  if (BOOKS[v]) bindForm(v);
+  ui.flash = null;
+}
+
+document.addEventListener('click', ev => {
+  const t = ev.target.closest('[data-act],[data-tab],[data-sub],[data-del]'); if (!t) return;
+  if (t.dataset.tab) { ui.tab = t.dataset.tab; render(); window.scrollTo(0, 0); }
+  else if (t.dataset.sub) { ui.sub = t.dataset.sub; render(); }
+  else if (t.dataset.del) { const [b, id] = t.dataset.del.split(':'); removeEntry(b, parseInt(id, 10)); render(); }
+  else if (t.dataset.act === 'load') { loadSample(); if (ui.tab === 'home') ui.tab = 'tx'; render(); }
+  else if (t.dataset.act === 'clear') { db = freshDb(); save(); render(); }
+});
+document.addEventListener('change', ev => { if (ev.target.id === 'test-mode') { ui.test = ev.target.checked; } });
+
+restore();
+render();
+</script>
+
+</body></html>
